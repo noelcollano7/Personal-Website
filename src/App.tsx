@@ -598,27 +598,34 @@ function ContactPage() {
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from('contact_messages').insert({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        subject: form.subject.trim(),
-        message: form.message.trim(),
-        website,
-      })
+      const { data, error } = await supabase.functions.invoke<{ saved: boolean }>(
+        'send-contact-email',
+        {
+          body: {
+            name: form.name.trim(),
+            email: form.email.trim(),
+            subject: form.subject.trim(),
+            message: form.message.trim(),
+            website,
+          },
+        },
+      )
 
       if (error) throw error
+      if (!data?.saved) throw new Error('The contact form did not confirm that the message was saved.')
 
       setFeedback({
         type: 'success',
-        message: 'Your message has been sent successfully. Thank you for reaching out.',
+        message: 'Your message has been received. Thank you for reaching out.',
       })
+
       setForm({ name: '', email: '', subject: '', message: '' })
       setWebsite('')
     } catch (error) {
       console.error('Contact form submission failed:', error)
       setFeedback({
         type: 'error',
-        message: 'We could not send your message right now. Please try again.',
+        message: 'We could not submit your message right now. Please try again.',
       })
     } finally {
       submissionInProgress.current = false
