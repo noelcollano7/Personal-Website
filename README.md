@@ -38,6 +38,10 @@ This writes the production bundle to the `dist` folder.
 4. Save and deploy.
 5. Keep the `_redirects` file in the public folder so browser routes resolve correctly.
 
+## Vercel Deployment
+
+Import the repository into Vercel and use the Vite defaults (`npm run build`, output directory `dist`). Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in **Project Settings → Environment Variables** for Production (and Preview if used), then redeploy. Vite embeds these public values during the build. `vercel.json` rewrites browser routes such as `/contact` to the app entry point.
+
 ## GitHub Setup
 
 ```bash
