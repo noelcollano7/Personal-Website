@@ -1,4 +1,4 @@
-# Ari Santos Portfolio
+
 
 A premium personal portfolio website for a customer service professional with a growing focus on AI automation and workflow optimization.
 
