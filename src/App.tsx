@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, type ChangeEvent, type FormEvent, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   Check,
@@ -11,6 +11,8 @@ import {
 import { BrowserRouter, Link, NavLink, Route, Routes } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import homeImage from '../image.png'
+
+const Chatbot = lazy(() => import('./components/Chatbot'))
 
 type Project = {
   title: string
@@ -118,8 +120,9 @@ function PortfolioApp() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[#ece3d7] px-3 py-4 text-[#252525] sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1400px] overflow-hidden rounded-[28px] border border-[#cabfb4] bg-[#f7f3ee] shadow-[0_30px_80px_rgba(37,37,37,0.08)]">
+    <>
+      <div className="min-h-screen bg-[#ece3d7] px-3 py-4 text-[#252525] sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1400px] overflow-hidden rounded-[28px] border border-[#cabfb4] bg-[#f7f3ee] shadow-[0_30px_80px_rgba(37,37,37,0.08)]">
         <header className="border-b border-[#cabfb4] bg-[#f7f3ee]/90 backdrop-blur-sm">
           <nav className="relative mx-auto flex max-w-6xl items-center justify-end px-4 py-5 sm:px-6 lg:px-8">
             <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
@@ -215,8 +218,12 @@ function PortfolioApp() {
             </div>
           </div>
         </footer>
+        </div>
       </div>
-    </div>
+      <Suspense fallback={null}>
+        <Chatbot />
+      </Suspense>
+    </>
   )
 }
 
