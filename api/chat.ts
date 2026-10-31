@@ -20,6 +20,53 @@ class PayloadTooLargeError extends Error {}
 
 let chatRateLimiter: Ratelimit | undefined
 
+function sanitizeDiagnosticText(value: string): string {
+  return value
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/https?:\/\/[^\s"'<>]+/gi, '[redacted-url]')
+    .replace(/\b(bearer|basic)\s+[^\s,;]+/gi, '$1 [redacted]')
+    .replace(
+      /\b(authorization|x-api-key|api[_-]?key|token|secret|password|credential)\b\s*[:=]\s*["']?[^,\s;"']+/gi,
+      '$1=[redacted]',
+    )
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[redacted-ip]')
+    .replace(/\b(?:[a-f\d]{0,4}:){2,}[a-f\d:.]{0,}\b/gi, '[redacted-ip]')
+    .replace(/\b[a-z\d_~+/=-]{32,}\b/gi, '[redacted-value]')
+    .slice(0, 240)
+}
+
+function logDiagnostic(stage: string, error: unknown): void {
+  const errorName = error instanceof Error ? error.name : 'UnknownError'
+  const errorMessage =
+    error instanceof Error ? error.message : 'A non-Error value was thrown.'
+
+  console.error(`[api/chat] ${stage}`, {
+    errorName: sanitizeDiagnosticText(errorName),
+    errorMessage: sanitizeDiagnosticText(errorMessage),
+  })
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) return undefined
+
+  if ('statusCode' in error && typeof error.statusCode === 'number') {
+    return error.statusCode
+  }
+  if ('status' in error && typeof error.status === 'number') {
+    return error.status
+  }
+  return undefined
+}
+
+function logAiError(error: unknown): void {
+  const status = getErrorStatus(error)
+  const stage =
+    status === 401 || status === 403
+      ? 'ai_gateway_authentication_error'
+      : 'ai_model_provider_error'
+  logDiagnostic(stage, error)
+}
+
 function jsonError(
   status: number,
   message: string,
@@ -65,9 +112,10 @@ async function readJsonBody(request: Request): Promise<unknown> {
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
 }
 
-function getChatRateLimiter(): Ratelimit | undefined {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+function getChatRateLimiter(
+  url: string | undefined,
+  token: string | undefined,
+): Ratelimit | undefined {
   if (!url || !token) return undefined
 
   if (!chatRateLimiter) {
@@ -84,20 +132,39 @@ function getChatRateLimiter(): Ratelimit | undefined {
 }
 
 async function rateLimitResponse(request: Request): Promise<Response | undefined> {
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  console.info('[api/chat] Upstash configuration', {
+    redisUrlConfigured: Boolean(redisUrl),
+    redisTokenConfigured: Boolean(redisToken),
+  })
+
   const visitorIp = request.headers.get('x-real-ip')
   if (!visitorIp || !isIP(visitorIp)) {
+    logDiagnostic(
+      'trusted_client_ip_unavailable',
+      new Error('A valid trusted client IP was not provided.'),
+    )
     return jsonError(503, 'Request protection is temporarily unavailable.')
   }
 
   try {
-    const limiter = getChatRateLimiter()
+    const limiter = getChatRateLimiter(redisUrl, redisToken)
     if (!limiter) {
+      logDiagnostic(
+        'upstash_configuration_missing',
+        new Error('Upstash Redis REST credentials are not configured.'),
+      )
       return jsonError(503, 'Request protection is not configured.')
     }
 
     const identifier = createHash('sha256').update(visitorIp).digest('hex')
     const result = await limiter.limit(identifier)
     if (result.reason === 'timeout') {
+      logDiagnostic(
+        'upstash_rate_limit_timeout',
+        new Error('The Upstash rate-limit request timed out.'),
+      )
       return jsonError(503, 'Request protection is temporarily unavailable.')
     }
 
@@ -107,7 +174,8 @@ async function rateLimitResponse(request: Request): Promise<Response | undefined
         'Retry-After': String(retryAfter),
       })
     }
-  } catch {
+  } catch (error) {
+    logDiagnostic('upstash_connection_or_rate_limit_error', error)
     return jsonError(503, 'Request protection is temporarily unavailable.')
   }
 }
@@ -193,7 +261,11 @@ async function handler(request: Request): Promise<Response> {
     return jsonError(400, 'The latest conversation message must be from the user.')
   }
 
-  if (!process.env.AI_GATEWAY_API_KEY?.trim()) {
+  const gatewayApiKeyConfigured = Boolean(process.env.AI_GATEWAY_API_KEY?.trim())
+  if (!gatewayApiKeyConfigured) {
+    console.error('[api/chat] AI Gateway configuration', {
+      gatewayApiKeyConfigured,
+    })
     return jsonError(503, 'The chat service is not configured yet.')
   }
 
@@ -208,12 +280,16 @@ async function handler(request: Request): Promise<Response> {
     })
 
     return result.toUIMessageStreamResponse({
-      onError: () => 'The AI service is temporarily unavailable. Please try again later.',
+      onError: (error) => {
+        logAiError(error)
+        return 'The AI service is temporarily unavailable. Please try again later.'
+      },
     })
-  } catch {
+  } catch (error) {
     if (request.signal.aborted) {
       return new Response(null, { status: 499 })
     }
+    logAiError(error)
     return jsonError(502, 'The AI service is temporarily unavailable.')
   }
 }
