@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^4.0.132",
+    "@ai-sdk/google": "^4.0.109",
     "@ai-sdk/react": "^4.0.163",
     "@supabase/supabase-js": "^2.118.0",
     "@upstash/ratelimit": "^2.2.0",

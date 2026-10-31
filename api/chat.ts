@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
-import { gateway } from '@ai-sdk/gateway'
+import { google } from '@ai-sdk/google'
 import {
   convertToModelMessages,
   safeValidateUIMessages,
@@ -12,7 +12,7 @@ import {
 const MAX_REQUEST_BYTES = 32 * 1024
 const MAX_MESSAGES = 20
 const MAX_INPUT_CHARACTERS = 12_000
-const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite'
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite'
 const DEFAULT_SYSTEM_PROMPT =
   'You are an assistant for a personal portfolio. The owner reports customer service experience with Comcast and Xfinity, an undergraduate Mechanical Engineering background, and AI development and automation skills. Only state details present in this instruction or the additional portfolio context. Never invent work history, dates, titles, qualifications, certifications, projects, services, pricing, or availability. If asked for information not provided, say it is not available yet and suggest contacting the owner.'
 
@@ -62,9 +62,18 @@ function logAiError(error: unknown): void {
   const status = getErrorStatus(error)
   const stage =
     status === 401 || status === 403
-      ? 'ai_gateway_authentication_error'
-      : 'ai_model_provider_error'
-  logDiagnostic(stage, error)
+      ? 'google_gemini_authentication_or_permission_error'
+      : status === 429
+        ? 'google_gemini_rate_limit_or_quota_error'
+        : status === 404
+          ? 'google_gemini_model_unavailable_or_not_found'
+        : 'google_gemini_provider_error'
+  const errorName = error instanceof Error ? error.name : 'UnknownError'
+
+  console.error(`[api/chat] ${stage}`, {
+    errorName: sanitizeDiagnosticText(errorName),
+    ...(status === undefined ? {} : { providerStatus: status }),
+  })
 }
 
 function jsonError(
@@ -261,10 +270,12 @@ async function handler(request: Request): Promise<Response> {
     return jsonError(400, 'The latest conversation message must be from the user.')
   }
 
-  const gatewayApiKeyConfigured = Boolean(process.env.AI_GATEWAY_API_KEY?.trim())
-  if (!gatewayApiKeyConfigured) {
-    console.error('[api/chat] AI Gateway configuration', {
-      gatewayApiKeyConfigured,
+  const googleApiKeyConfigured = Boolean(
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim(),
+  )
+  if (!googleApiKeyConfigured) {
+    console.error('[api/chat] Google Gemini configuration', {
+      googleApiKeyConfigured,
     })
     return jsonError(503, 'The chat service is not configured yet.')
   }
@@ -272,18 +283,16 @@ async function handler(request: Request): Promise<Response> {
   try {
     const modelMessages = await convertToModelMessages(messages)
     const result = streamText({
-      model: gateway(process.env.AI_MODEL?.trim() || DEFAULT_MODEL),
+      model: google(process.env.AI_MODEL?.trim() || DEFAULT_MODEL),
       system: `${DEFAULT_SYSTEM_PROMPT}\n\nAdditional portfolio context and instructions:\n${process.env.CHATBOT_SYSTEM_PROMPT?.trim() || 'No additional portfolio context has been configured.'}`,
       messages: modelMessages,
       maxOutputTokens: 512,
       abortSignal: request.signal,
+      onError: ({ error }) => logAiError(error),
     })
 
     return result.toUIMessageStreamResponse({
-      onError: (error) => {
-        logAiError(error)
-        return 'The AI service is temporarily unavailable. Please try again later.'
-      },
+      onError: () => 'The AI service is temporarily unavailable. Please try again later.',
     })
   } catch (error) {
     if (request.signal.aborted) {
