@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './lib/supabase'
+import BackgroundMusicPlayer from './components/BackgroundMusicPlayer'
 
 type Project = {
   title: string
@@ -130,6 +131,7 @@ function PortfolioApp() {
   return (
     <>
       <div className="min-h-screen bg-[#edf1f5] text-[#17243b]">
+        <BackgroundMusicPlayer />
         <header className="sticky top-0 z-40 border-b border-[#cad4df] bg-[#edf1f5]/95 backdrop-blur-md">
           <nav className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
             <Link to="/" className="text-sm font-semibold tracking-[0.08em] text-[#17243b]">

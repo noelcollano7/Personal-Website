@@ -47,6 +47,108 @@ button {
   cursor: pointer;
 }
 
+.music-player {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  color: #17243b;
+  background: rgb(237 241 245 / 94%);
+  border: 1px solid #cad4df;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgb(23 36 59 / 12%);
+  backdrop-filter: blur(12px);
+  animation: music-player-enter 350ms ease-out both;
+}
+
+.music-player__button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.music-player__button:hover {
+  color: #fff;
+  background: #17243b;
+}
+
+.music-player__button:active {
+  transform: scale(0.94);
+}
+
+.music-player__button:focus-visible {
+  outline: 2px solid #62799a;
+  outline-offset: 2px;
+}
+
+.music-player__visual {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-left: 0.45rem;
+  color: #62799a;
+}
+
+.music-player__bars {
+  display: flex;
+  height: 1rem;
+  align-items: center;
+  gap: 2px;
+}
+
+.music-player__bars i {
+  width: 2px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+.music-player__visual.is-playing .music-player__bars i {
+  animation: music-bars 700ms ease-in-out infinite alternate;
+}
+
+.music-player__visual.is-playing .music-player__bars i:nth-child(2) {
+  animation-delay: 180ms;
+}
+
+.music-player__visual.is-playing .music-player__bars i:nth-child(3) {
+  animation-delay: 360ms;
+}
+
+.music-player__hint {
+  max-width: 10rem;
+  padding-left: 0.55rem;
+  color: #66758a;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  animation: music-hint-enter 250ms ease-out both;
+}
+
+@keyframes music-bars {
+  from { height: 4px; }
+  to { height: 14px; }
+}
+
+@keyframes music-player-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes music-hint-enter {
+  from { opacity: 0; transform: translateX(4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 a {
   text-decoration: none;
 }
