@@ -1,18 +1,13 @@
-import { lazy, Suspense, type ChangeEvent, type FormEvent, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
-  Check,
   ChevronRight,
   ExternalLink,
   Menu,
-  Sparkles,
   X,
 } from 'lucide-react'
-import { BrowserRouter, Link, NavLink, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import homeImage from '../image.png'
-
-const Chatbot = lazy(() => import('./components/Chatbot'))
 
 type Project = {
   title: string
@@ -32,11 +27,24 @@ type FormState = {
   message: string
 }
 
+type VideoRecord = {
+  id: string
+  title: string
+  description: string
+  youtube_url: string
+  is_published: boolean
+  published_at: string | null
+  created_at: string
+  updated_at: string
+  owner_id: string
+}
+
 const navItems = [
   { label: 'Home', to: '/' },
   { label: 'About', to: '/about' },
   { label: 'Projects', to: '/projects' },
   { label: 'Contact', to: '/contact' },
+  { label: 'Watch', to: '/watch' },
 ]
 
 const heroHighlights = [
@@ -121,19 +129,21 @@ function PortfolioApp() {
 
   return (
     <>
-      <div className="min-h-screen bg-[#ece3d7] px-3 py-4 text-[#252525] sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-[1400px] overflow-hidden rounded-[28px] border border-[#cabfb4] bg-[#f7f3ee] shadow-[0_30px_80px_rgba(37,37,37,0.08)]">
-        <header className="border-b border-[#cabfb4] bg-[#f7f3ee]/90 backdrop-blur-sm">
-          <nav className="relative mx-auto flex max-w-6xl items-center justify-end px-4 py-5 sm:px-6 lg:px-8">
-            <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-8 md:flex">
+      <div className="min-h-screen bg-[#edf1f5] text-[#17243b]">
+        <header className="sticky top-0 z-40 border-b border-[#cad4df] bg-[#edf1f5]/95 backdrop-blur-md">
+          <nav className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+            <Link to="/" className="text-sm font-semibold tracking-[0.08em] text-[#17243b]">
+              NOEL COLLANO
+            </Link>
+            <div className="hidden items-center gap-8 md:flex">
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.to === '/'}
                   className={({ isActive }) =>
-                    `text-sm font-medium transition-colors ${
-                      isActive ? 'text-[#252525]' : 'text-[#68635f] hover:text-[#252525]'
+                    `relative text-sm font-medium transition-colors after:absolute after:-bottom-2 after:left-0 after:h-px after:bg-[#17243b] after:transition-all ${
+                      isActive ? 'text-[#17243b] after:w-full' : 'text-[#66758a] after:w-0 hover:text-[#17243b] hover:after:w-full'
                     }`
                   }
                 >
@@ -144,10 +154,10 @@ function PortfolioApp() {
 
             <div className="hidden md:block">
               <Link
-                to="/contact"
-                className="inline-flex items-center gap-2 rounded-full border border-[#6e7560] bg-[#6e7560] px-4 py-2.5 text-sm font-medium text-[#f8f5f1] transition-transform hover:-translate-y-0.5 hover:bg-[#59654c]"
+                to="/signin"
+                className="inline-flex items-center gap-2 border-b border-[#17243b] pb-1 text-sm font-semibold text-[#17243b]"
               >
-                Let&apos;s Talk
+                Sign In
                 <ArrowRight size={16} />
               </Link>
             </div>
@@ -155,7 +165,7 @@ function PortfolioApp() {
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#cabfb4] text-[#252525] md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#cad4df] text-[#17243b] md:hidden"
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={menuOpen}
             >
@@ -164,8 +174,8 @@ function PortfolioApp() {
           </nav>
 
           {menuOpen && (
-            <div className="border-t border-[#cabfb4] bg-[#f7f3ee] px-4 py-4 md:hidden">
-              <div className="mx-auto flex max-w-6xl flex-col gap-3">
+            <div className="border-t border-[#cad4df] bg-[#edf1f5] px-5 py-5 md:hidden">
+              <div className="mx-auto flex max-w-6xl flex-col gap-1">
                 {navItems.map((item) => (
                   <NavLink
                     key={item.to}
@@ -173,8 +183,8 @@ function PortfolioApp() {
                     end={item.to === '/'}
                     onClick={() => setMenuOpen(false)}
                     className={({ isActive }) =>
-                      `rounded-xl px-3 py-2 text-sm font-medium ${
-                        isActive ? 'bg-[#efe7df] text-[#252525]' : 'text-[#68635f] hover:bg-[#f1ece7]'
+                      `border-b border-[#cad4df] py-3 text-sm font-medium ${
+                        isActive ? 'text-[#17243b]' : 'text-[#66758a]'
                       }`
                     }
                   >
@@ -182,11 +192,11 @@ function PortfolioApp() {
                   </NavLink>
                 ))}
                 <Link
-                  to="/contact"
+                  to="/signin"
                   onClick={() => setMenuOpen(false)}
-                  className="mt-2 inline-flex items-center justify-center gap-2 rounded-full border border-[#6e7560] bg-[#6e7560] px-4 py-2.5 text-sm font-medium text-[#f8f5f1]"
+                  className="mt-4 inline-flex items-center gap-2 py-2 text-sm font-semibold"
                 >
-                  Let&apos;s Talk
+                  Sign In
                   <ArrowRight size={16} />
                 </Link>
               </div>
@@ -194,35 +204,35 @@ function PortfolioApp() {
           )}
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:px-10 lg:py-14">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/watch" element={<WatchPage />} />
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </main>
 
-        <footer className="border-t border-[#cabfb4] bg-[#f3eee9]">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <footer className="border-t border-[#cad4df]">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-[#68635f]">Noel Collano</p>
-              <p className="mt-2 text-sm text-[#68635f]">Customer service professional · AI Full-Stack Developer · AI Automation Specialist</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em]">Noel Collano</p>
+              <p className="mt-2 text-sm text-[#66758a]">Customer service · AI full-stack development · Automation</p>
             </div>
-            <div className="flex flex-wrap items-center gap-6 text-sm text-[#68635f]">
+            <div className="flex flex-wrap items-center gap-6 text-sm text-[#66758a]">
               {navItems.map((item) => (
-                <Link key={item.to} to={item.to} className="transition-colors hover:text-[#252525]">
+                <Link key={item.to} to={item.to} className="transition-colors hover:text-[#17243b]">
                   {item.label}
                 </Link>
               ))}
             </div>
           </div>
         </footer>
-        </div>
       </div>
-      <Suspense fallback={null}>
-        <Chatbot />
-      </Suspense>
     </>
   )
 }
@@ -230,141 +240,104 @@ function PortfolioApp() {
 function HomePage() {
   return (
     <>
-      <section className="rounded-[28px] border border-[#cabfb4] bg-[#f8f4f0] p-4 sm:p-6 lg:p-8">
-        <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12">
-          <div className="space-y-7">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#cabfb4] bg-[#efe7df] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.24em] text-[#5d5a57]">
-              <Sparkles size={12} />
-              Customer service · AI Web Development
-            </div>
-
-            <div className="space-y-5">
-              <h1 className="max-w-xl text-4xl font-semibold leading-[1.04] tracking-[-0.06em] text-[#252525] sm:text-5xl lg:text-6xl">
-                Virtual Assistant / AI Automation Specialist
-              </h1>
-
-              <p className="max-w-xl text-base leading-8 text-[#5c5854] sm:text-lg">
-                I'm a customer service professional with experience supporting telecommunications customers and an AI full-stack developer.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/projects"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#6e7560] px-5 py-3 text-sm font-medium text-[#f8f5f1] transition-transform hover:-translate-y-0.5 hover:bg-[#59654c]"
-              >
-                Explore My Projects
-                <ArrowRight size={16} />
-              </Link>
-              <Link
-                to="/contact"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#cabfb4] bg-white/60 px-5 py-3 text-sm font-medium text-[#252525] transition-colors hover:bg-white"
-              >
-                Get in Touch
-              </Link>
-            </div>
-
-            <p className="flex items-center gap-2 text-sm text-[#5d5a57]">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#6e7560]" />
-              Open to Remote Opportunities &amp; Freelance Projects
-            </p>
-
+      <section className="grid min-h-[620px] items-center border-b border-[#cad4df] pb-14">
+        <div className="space-y-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#62799a]">
+            Virtual Assistant · AI Automation
+          </p>
+          <h1 className="max-w-2xl text-5xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-6xl lg:text-7xl">
+            Practical support,
+            <br />
+            smarter systems.
+          </h1>
+          <p className="max-w-xl text-lg leading-8 text-[#66758a]">
+            I help teams serve customers better and reduce repetitive work through dependable support, AI automation, and thoughtful web development.
+          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Link
+              to="/projects"
+              className="inline-flex items-center justify-center gap-3 bg-[#17243b] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#263b5a]"
+            >
+              View my work
+              <ArrowRight size={16} />
+            </Link>
+            <Link
+              to="/contact"
+              className="inline-flex items-center justify-center gap-2 border-b border-[#17243b] px-1 py-2 text-sm font-semibold"
+            >
+              Start a conversation
+            </Link>
           </div>
-
-          <div className="relative">
-            <div className="relative overflow-hidden rounded-[28px] border border-[#cabfb4] bg-[#efe7df] p-2 shadow-[0_20px_40px_rgba(79,68,58,0.10)] transition-transform duration-300 hover:-translate-y-1">
-              <img
-                src={homeImage}
-                alt="Professional portrait"
-                className="h-[520px] w-full rounded-[20px] object-cover"
-              />
-            </div>
-            <div className="absolute -bottom-5 left-4 rounded-2xl border border-[#cabfb4] bg-[#f7f3ee]/90 px-4 py-3 shadow-[0_12px_30px_rgba(37,37,37,0.08)] backdrop-blur-sm">
-              <p className="text-[10px] uppercase tracking-[0.24em] text-[#68635f]">Based in the Philippines</p>
-              <p className="mt-1 text-sm font-medium text-[#252525]">Hello! I'm Noel Collano, Virtual Assistant & AI Full-Stack Developer.</p>
-            </div>
-          </div>
+          <p className="flex items-center gap-3 text-sm text-[#66758a]">
+            <span className="h-2 w-2 rounded-full bg-[#62799a]" />
+            Based in the Philippines · Open to remote work
+          </p>
         </div>
+
       </section>
 
-      <section className="mt-8 rounded-[28px] border border-[#cabfb4] bg-[#f5efe9] p-5 sm:p-6 lg:p-8">
-        <div className="flex items-center justify-between gap-4 border-b border-[#cabfb4] pb-4">
+      <section className="py-14">
+        <div className="grid gap-10 lg:grid-cols-[0.28fr_0.72fr]">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">Professional Highlights</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#252525]">How I bring value?</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Core strengths</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em]">How I help</h2>
           </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {heroHighlights.map((highlight) => (
-            <div key={highlight} className="rounded-2xl border border-[#cabfb4] bg-[#f8f4f0] p-4 transition-colors hover:bg-[#f3eee7]">
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#e7dfd4] text-[#6e7560]">
-                <Check size={18} />
+          <div className="divide-y divide-[#cad4df] border-y border-[#cad4df]">
+            {heroHighlights.map((highlight, index) => (
+              <div key={highlight} className="grid grid-cols-[3.5rem_1fr] items-center py-5">
+                <span className="text-sm text-[#62799a]">0{index + 1}</span>
+                <p className="text-base font-medium sm:text-lg">{highlight}</p>
               </div>
-              <p className="text-base font-medium leading-7 text-[#252525]">{highlight}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="mt-8 rounded-[28px] border border-[#cabfb4] bg-[#f8f4f0] p-5 sm:p-6 lg:p-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section className="border-t border-[#cad4df] py-14">
+        <div className="flex items-end justify-between gap-6">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">Featured Projects</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[#252525]">Selected work</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Selected work</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">Recent projects</h2>
           </div>
-          <Link to="/projects" className="inline-flex items-center gap-2 text-sm font-medium text-[#6e7560] hover:text-[#4b5344]">
-            View all projects
+          <Link to="/projects" className="hidden items-center gap-2 border-b border-[#17243b] pb-1 text-sm font-semibold sm:inline-flex">
+            View all
             <ChevronRight size={16} />
           </Link>
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-3">
-          {projects.map((project) => (
-            <div key={project.title} className="group overflow-hidden rounded-[24px] border border-[#cabfb4] bg-[#f3eee8] transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_18px_35px_rgba(37,37,37,0.08)]">
-              <img src={project.image} alt={project.title} className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
-              <div className="space-y-4 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="rounded-full border border-[#cdd3c5] bg-[#edf0eb] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#59654c]">
-                    {project.category}
-                  </span>
-                  <span className="text-xs font-medium text-[#68635f]">{project.status}</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold tracking-[-0.04em] text-[#252525]">{project.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[#5d5a57]">{project.overview}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {project.technologies.slice(0, 3).map((tech) => (
-                    <span key={tech} className="rounded-full border border-[#cabfb4] bg-[#f8f4f0] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-[#5d5a57]">
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-                <Link to="/projects" className="inline-flex items-center gap-2 text-sm font-medium text-[#6e7560] hover:text-[#4a5141]">
-                  View Project
+        <div className="mt-8 divide-y divide-[#cad4df] border-y border-[#cad4df]">
+          {projects.map((project, index) => (
+            <article key={project.title} className="grid gap-5 py-7 lg:grid-cols-[4rem_0.32fr_0.68fr] lg:items-start">
+              <span className="text-sm text-[#62799a]">0{index + 1}</span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#62799a]">{project.category}</p>
+                <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em]">{project.title}</h3>
+              </div>
+              <div className="lg:flex lg:items-end lg:justify-between lg:gap-8">
+                <p className="max-w-xl text-sm leading-7 text-[#66758a]">{project.overview}</p>
+                <Link to="/projects" className="mt-5 inline-flex shrink-0 items-center gap-2 border-b border-[#17243b] pb-1 text-sm font-semibold lg:mt-0">
+                  Details
                   <ExternalLink size={14} />
                 </Link>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       </section>
 
-      <section className="mt-8 rounded-[28px] border border-[#cabfb4] bg-[#efe7df] p-6 sm:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <section className="border-t border-[#cad4df] py-14">
+        <div className="grid gap-8 lg:grid-cols-[0.65fr_0.35fr] lg:items-end">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">Let&apos;s build better experiences</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[#252525]">Have a project in mind?</h2>
-            <p className="mt-3 max-w-xl text-base leading-7 text-[#5d5a57]">
-              Let&apos;s discuss how I can contribute to your team or help improve your business workflows.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Let&apos;s work together</p>
+            <h2 className="mt-3 max-w-2xl text-4xl font-semibold leading-tight tracking-[-0.05em] sm:text-5xl">
+              Ready to improve your customer experience or workflow?
+            </h2>
           </div>
           <Link
             to="/contact"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#252525] px-5 py-3 text-sm font-medium text-[#f8f5f1] transition-transform hover:-translate-y-0.5"
+            className="inline-flex w-fit items-center gap-3 border-b border-[#17243b] pb-2 text-sm font-semibold"
           >
-            Contact Me
+            Get in touch
             <ArrowRight size={16} />
           </Link>
         </div>
@@ -375,14 +348,14 @@ function HomePage() {
 
 function AboutPage() {
   return (
-    <div className="space-y-8 rounded-[28px] border border-[#cabfb4] bg-[#f8f4f0] p-5 sm:p-6 lg:p-8">
-      <section className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+    <div className="space-y-14">
+      <section className="grid gap-8 border-b border-[#cad4df] pb-14 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="space-y-6">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">About</p>
-          <h1 className="text-4xl font-semibold tracking-[-0.06em] text-[#252525] sm:text-5xl">A Little About Me</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">About</p>
+          <h1 className="text-5xl font-semibold leading-none tracking-[-0.06em] sm:text-6xl">A little about me</h1>
         </div>
 
-        <div className="space-y-5 text-base leading-8 text-[#5d5a57]">
+        <div className="space-y-5 text-base leading-8 text-[#66758a]">
           <p>
             I&apos;m a customer service professional from the Philippines with an undergraduate background in Mechanical Engineering. My professional experience includes supporting customers with mobile, internet, and landline services for Comcast and Xfinity.
           </p>
@@ -392,20 +365,20 @@ function AboutPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-[24px] border border-[#cabfb4] bg-[#f3eee8] p-5">
-          <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[#252525]">Professional Background</h2>
-          <ul className="mt-5 space-y-4 text-sm leading-7 text-[#5d5a57]">
-            <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-[#6e7560]" />Customer service and telecommunications support.</li>
-            <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-[#6e7560]" />Customer communication and problem-solving.</li>
-            <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-[#6e7560]" />Mechanical Engineering academic background.</li>
-            <li className="flex gap-3"><span className="mt-2 h-2 w-2 rounded-full bg-[#6e7560]" />Continued development in AI automation and web technologies.</li>
+      <section className="grid gap-10 border-b border-[#cad4df] pb-14 lg:grid-cols-2">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.05em]">Professional background</h2>
+          <ul className="mt-6 divide-y divide-[#cad4df] border-y border-[#cad4df] text-sm leading-7 text-[#66758a]">
+            <li className="py-4">Customer service and telecommunications support.</li>
+            <li className="py-4">Customer communication and problem-solving.</li>
+            <li className="py-4">Mechanical Engineering academic background.</li>
+            <li className="py-4">Continued development in AI automation and web technologies.</li>
           </ul>
         </div>
 
-        <div className="rounded-[24px] border border-[#cabfb4] bg-[#efe7df] p-5">
-          <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[#252525]">My Approach</h2>
-          <p className="mt-4 text-sm leading-7 text-[#5d5a57]">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.05em]">My approach</h2>
+          <p className="mt-6 border-t border-[#cad4df] pt-6 text-sm leading-7 text-[#66758a]">
             I believe the best customer and business experiences come from clear communication, dependable support, and the smart use of practical technology. I bring a calm, solutions-focused mindset to every challenge and continue learning to improve the quality of my work.
           </p>
         </div>
@@ -413,20 +386,17 @@ function AboutPage() {
 
       <section className="space-y-5">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">Core Skills</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[#252525]">What I bring</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Core skills</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em]">What I bring</h2>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid border-y border-[#cad4df] md:grid-cols-3">
           {skillGroups.map((group) => (
-            <div key={group.title} className="rounded-[22px] border border-[#cabfb4] bg-[#f3eee8] p-5">
-              <h3 className="text-lg font-semibold text-[#252525]">{group.title}</h3>
-              <ul className="mt-4 space-y-3 text-sm text-[#5d5a57]">
+            <div key={group.title} className="border-b border-[#cad4df] py-6 md:border-b-0 md:border-r md:px-6 md:first:pl-0 md:last:border-r-0 md:last:pr-0">
+              <h3 className="text-lg font-semibold">{group.title}</h3>
+              <ul className="mt-4 space-y-3 text-sm text-[#66758a]">
                 {group.items.map((skill) => (
                   <li key={skill} className="flex items-center gap-2">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#e7dfd4] text-[10px] text-[#6e7560]">
-                      ✓
-                    </span>
                     {skill}
                   </li>
                 ))}
@@ -451,22 +421,22 @@ function ProjectsPage() {
   }, [activeFilter])
 
   return (
-    <div className="space-y-8 rounded-[28px] border border-[#cabfb4] bg-[#f8f4f0] p-5 sm:p-6 lg:p-8">
-      <section className="space-y-5">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">Projects</p>
-        <h1 className="text-4xl font-semibold tracking-[-0.06em] text-[#252525] sm:text-5xl">Practical ideas and growing skills</h1>
+    <div className="space-y-10">
+      <section className="space-y-5 border-b border-[#cad4df] pb-10">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Projects</p>
+        <h1 className="max-w-3xl text-5xl font-semibold leading-none tracking-[-0.06em] sm:text-6xl">Practical ideas and growing skills</h1>
       </section>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-x-6 gap-y-3 border-b border-[#cad4df] pb-5">
         {filterOptions.map((option) => (
           <button
             key={option}
             type="button"
             onClick={() => setActiveFilter(option)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+            className={`border-b pb-1 text-sm font-medium transition-colors ${
               activeFilter === option
-                ? 'border-[#6e7560] bg-[#6e7560] text-[#f8f5f1]'
-                : 'border-[#cabfb4] bg-[#f3eee8] text-[#252525] hover:border-[#6e7560] hover:text-[#6e7560]'
+                ? 'border-[#17243b] text-[#17243b]'
+                : 'border-transparent text-[#66758a] hover:text-[#17243b]'
             }`}
           >
             {option}
@@ -474,37 +444,39 @@ function ProjectsPage() {
         ))}
       </div>
 
-      <section className="grid gap-5 lg:grid-cols-2">
+      <section className="divide-y divide-[#cad4df] border-y border-[#cad4df]">
         {filteredProjects.map((project) => (
-          <article key={project.title} className="overflow-hidden rounded-[24px] border border-[#cabfb4] bg-[#f3eee8]">
-            <img src={project.image} alt={project.title} className="h-56 w-full object-cover" />
-            <div className="space-y-5 p-5">
+          <article key={project.title} className="grid gap-6 py-8 lg:grid-cols-[0.34fr_0.66fr]">
+            <div>
+              <img src={project.image} alt={project.title} className="h-64 w-full object-cover grayscale-[15%]" />
+            </div>
+            <div className="space-y-5">
               <div className="flex items-center justify-between gap-3">
-                <span className="rounded-full border border-[#cdd3c5] bg-[#edf0eb] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-[#59654c]">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#62799a]">
                   {project.category}
                 </span>
-                <span className="text-xs font-medium text-[#68635f]">{project.status}</span>
+                <span className="text-xs font-medium text-[#66758a]">{project.status}</span>
               </div>
 
               <div>
-                <h2 className="text-2xl font-semibold tracking-[-0.05em] text-[#252525]">{project.title}</h2>
-                <p className="mt-3 text-sm leading-7 text-[#5d5a57]">{project.overview}</p>
+                <h2 className="text-2xl font-semibold tracking-[-0.05em]">{project.title}</h2>
+                <p className="mt-3 text-sm leading-7 text-[#66758a]">{project.overview}</p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#68635f]">Problem</p>
-                  <p className="mt-2 text-sm leading-6 text-[#5d5a57]">{project.problem}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#62799a]">Problem</p>
+                  <p className="mt-2 text-sm leading-6 text-[#66758a]">{project.problem}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#68635f]">Solution</p>
-                  <p className="mt-2 text-sm leading-6 text-[#5d5a57]">{project.solution}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#62799a]">Solution</p>
+                  <p className="mt-2 text-sm leading-6 text-[#66758a]">{project.solution}</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {project.technologies.map((tech) => (
-                  <span key={tech} className="rounded-full border border-[#cabfb4] bg-[#f8f4f0] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-[#5d5a57]">
+                  <span key={tech} className="border-l border-[#62799a] pl-2.5 text-[10px] uppercase tracking-[0.14em] text-[#66758a]">
                     {tech}
                   </span>
                 ))}
@@ -513,6 +485,553 @@ function ProjectsPage() {
             </div>
           </article>
         ))}
+      </section>
+    </div>
+  )
+}
+
+function getYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    const hostname = parsed.hostname.toLowerCase()
+    if (hostname === 'youtu.be') {
+      return parsed.pathname.slice(1).split('/')[0] || null
+    }
+    if (hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) {
+      const pathSegments = parsed.pathname.split('/').filter(Boolean)
+      if (['embed', 'shorts', 'live'].includes(pathSegments[0])) {
+        return pathSegments[1] || null
+      }
+      return parsed.searchParams.get('v')
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function WatchPage() {
+  const [videos, setVideos] = useState<VideoRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const client = supabase
+    if (!client) {
+      setError('Videos are temporarily unavailable.')
+      setLoading(false)
+      return
+    }
+
+    const loadVideos = async () => {
+      const { data, error: fetchError } = await client
+        .from('videos')
+        .select('id,title,description,youtube_url,is_published,published_at,created_at,updated_at,owner_id')
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+
+      if (fetchError) {
+        setError('Videos are temporarily unavailable.')
+      } else {
+        setVideos((data as VideoRecord[]) || [])
+      }
+      setLoading(false)
+    }
+
+    loadVideos()
+
+    const channel = client
+      .channel('published-videos')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'videos', filter: 'is_published=eq.true' },
+        loadVideos,
+      )
+      .subscribe()
+
+    return () => {
+      client.removeChannel(channel)
+    }
+  }, [])
+
+  return (
+    <div className="space-y-10">
+      <section className="space-y-5 border-b border-[#cad4df] pb-10">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Watch</p>
+        <h1 className="max-w-3xl text-5xl font-semibold leading-none tracking-[-0.06em] sm:text-6xl">Videos</h1>
+      </section>
+
+      {loading && <p className="text-sm text-[#66758a]">Loading videos...</p>}
+      {!loading && error && <p className="border-t border-[#cad4df] py-8 text-sm text-[#66758a]">{error}</p>}
+      {!loading && !error && videos.length === 0 && (
+        <p className="border-y border-[#cad4df] py-12 text-center text-sm text-[#66758a]">
+          No videos are available yet. Please check back soon.
+        </p>
+      )}
+
+      {!loading && !error && videos.length > 0 && (
+        <section className="grid gap-8 md:grid-cols-2">
+          {videos.map((video) => {
+            const videoId = getYouTubeVideoId(video.youtube_url)
+            if (!videoId) return null
+
+            return (
+              <article key={video.id} className="border-b border-[#cad4df] pb-8">
+                <div className="aspect-video overflow-hidden bg-[#dbe3ec]">
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+                    title={video.title}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+                <h2 className="mt-5 text-xl font-semibold tracking-[-0.03em]">{video.title}</h2>
+                {video.description && (
+                  <p className="mt-3 text-sm leading-7 text-[#66758a]">{video.description}</p>
+                )}
+              </article>
+            )
+          })}
+        </section>
+      )}
+    </div>
+  )
+}
+
+function SignInPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const recoveryMode = searchParams.get('mode') === 'recovery'
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [recoverySent, setRecoverySent] = useState(false)
+
+  useEffect(() => {
+    if (!supabase) return
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate('/admin', { replace: true })
+    })
+  }, [navigate])
+
+  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    if (!supabase) {
+      setError('Sign in is not configured yet.')
+      return
+    }
+    setSubmitting(true)
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    setSubmitting(false)
+    if (signInError) {
+      setError(signInError.message)
+      return
+    }
+    navigate('/admin', { replace: true })
+  }
+
+  const handleRecoveryRequest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    setRecoverySent(false)
+    if (!supabase) {
+      setError('Password recovery is not configured yet.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: new URL('/reset-password', window.location.origin).toString(),
+      })
+      if (recoveryError) {
+        setError(recoveryError.message)
+        return
+      }
+      setRecoverySent(true)
+    } catch (recoveryError) {
+      setError(recoveryError instanceof Error ? recoveryError.message : 'Unable to send a password recovery email.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-md border-y border-[#cad4df] py-10">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Admin</p>
+      <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em]">
+        {recoveryMode ? 'Reset your password' : 'Sign in'}
+      </h1>
+      {recoverySent && (
+        <p role="status" className="mt-5 text-sm text-[#385d48]">
+          If an account exists for that email, a password recovery link has been sent.
+        </p>
+      )}
+      <form onSubmit={recoveryMode ? handleRecoveryRequest : handleSignIn} className="mt-8 space-y-6">
+        <div>
+          <label htmlFor="signin-email" className="mb-2 block text-sm font-medium">Email</label>
+          <input
+            id="signin-email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]"
+          />
+        </div>
+        {!recoveryMode && (
+          <div>
+            <label htmlFor="signin-password" className="mb-2 block text-sm font-medium">Password</label>
+            <input
+              id="signin-password"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]"
+            />
+          </div>
+        )}
+        {error && <p role="alert" className="text-sm text-[#8c4335]">{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="inline-flex w-full items-center justify-center bg-[#17243b] px-5 py-3.5 text-sm font-semibold text-white hover:bg-[#263b5a] disabled:opacity-75"
+        >
+          {submitting
+            ? recoveryMode ? 'Sending link...' : 'Signing in...'
+            : recoveryMode ? 'Send recovery link' : 'Sign In'}
+        </button>
+      </form>
+      <div className="mt-5 text-sm">
+        {recoveryMode ? (
+          <Link to="/signin" className="font-medium text-[#17243b] underline underline-offset-4">
+            Back to sign in
+          </Link>
+        ) : (
+          <Link to="/signin?mode=recovery" className="font-medium text-[#17243b] underline underline-offset-4">
+            Forgot Password?
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ResetPasswordPage() {
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  const [hasSession, setHasSession] = useState(false)
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!supabase) return
+    let active = true
+
+    supabase.auth.getSession()
+      .then(({ data, error: sessionError }) => {
+        if (!active) return
+        if (sessionError) setError(sessionError.message)
+        else setHasSession(Boolean(data.session))
+      })
+      .catch((sessionError: unknown) => {
+        if (!active) return
+        setError(sessionError instanceof Error ? sessionError.message : 'Unable to verify the recovery session.')
+      })
+      .finally(() => {
+        if (active) setSessionChecked(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handlePasswordUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    setSuccess(false)
+    if (password !== confirmPassword) {
+      setError('The passwords do not match.')
+      return
+    }
+    if (!supabase) {
+      setError('Password recovery is not configured yet.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) {
+        setError(updateError.message)
+        return
+      }
+      setSuccess(true)
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Unable to update the password.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-md border-y border-[#cad4df] py-10">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Admin</p>
+      <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em]">Choose a new password</h1>
+      {!supabase ? (
+        <p role="alert" className="mt-6 text-sm text-[#8c4335]">Password recovery is not configured yet.</p>
+      ) : !sessionChecked ? (
+        <p className="mt-6 text-sm text-[#66758a]">Verifying your recovery link...</p>
+      ) : !hasSession ? (
+        <div className="mt-6 space-y-4">
+          <p role="alert" className="text-sm text-[#8c4335]">
+            {error || 'This password recovery link is invalid or expired. Request a new link to continue.'}
+          </p>
+          <Link
+            to="/signin?mode=recovery"
+            className="inline-flex text-sm font-medium text-[#17243b] underline underline-offset-4"
+          >
+            Request a new recovery link
+          </Link>
+        </div>
+      ) : (
+        <>
+          {error && <p role="alert" className="mt-6 text-sm text-[#8c4335]">{error}</p>}
+          {success ? (
+            <div className="mt-6 space-y-4">
+              <p role="status" className="text-sm text-[#385d48]">Your password has been updated successfully.</p>
+              <Link to="/admin" className="inline-flex text-sm font-medium text-[#17243b] underline underline-offset-4">
+                Continue to admin
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handlePasswordUpdate} className="mt-8 space-y-6">
+              <div>
+                <label htmlFor="new-password" className="mb-2 block text-sm font-medium">New password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]"
+                />
+              </div>
+              <div>
+                <label htmlFor="confirm-password" className="mb-2 block text-sm font-medium">Confirm new password</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex w-full items-center justify-center bg-[#17243b] px-5 py-3.5 text-sm font-semibold text-white hover:bg-[#263b5a] disabled:opacity-75"
+              >
+                {submitting ? 'Updating password...' : 'Update password'}
+              </button>
+            </form>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function AdminPage() {
+  const navigate = useNavigate()
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [authenticated, setAuthenticated] = useState(false)
+  const [videos, setVideos] = useState<VideoRecord[]>([])
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [isPublished, setIsPublished] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (!supabase) {
+      setSessionChecked(true)
+      return
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthenticated(Boolean(data.session))
+      setSessionChecked(true)
+    })
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthenticated(Boolean(session))
+      setSessionChecked(true)
+    })
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!authenticated || !supabase) return
+
+    supabase
+      .from('videos')
+      .select('id,title,description,youtube_url,is_published,published_at,created_at,updated_at,owner_id')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!error) setVideos((data as VideoRecord[]) || [])
+      })
+  }, [authenticated])
+
+  if (!sessionChecked) return <p className="text-sm text-[#66758a]">Loading...</p>
+  if (!authenticated) return <Navigate to="/signin" replace />
+
+  const resetForm = () => {
+    setTitle('')
+    setDescription('')
+    setYoutubeUrl('')
+    setIsPublished(false)
+    setEditingId(null)
+  }
+
+  const reloadVideos = async () => {
+    if (!supabase) return
+    const { data, error } = await supabase
+      .from('videos')
+      .select('id,title,description,youtube_url,is_published,published_at,created_at,updated_at,owner_id')
+      .order('created_at', { ascending: false })
+    if (!error) setVideos((data as VideoRecord[]) || [])
+  }
+
+  const saveVideo = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setMessage('')
+    if (!supabase) return
+    if (!getYouTubeVideoId(youtubeUrl)) {
+      setMessage('Please enter a valid YouTube URL.')
+      return
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const payload = {
+      title: title.trim(),
+      description: description.trim(),
+      youtube_url: youtubeUrl.trim(),
+      is_published: isPublished,
+      published_at: isPublished ? new Date().toISOString() : null,
+      owner_id: session.user.id,
+    }
+
+    const response = editingId
+      ? await supabase.from('videos').update(payload).eq('id', editingId)
+      : await supabase.from('videos').insert(payload)
+
+    if (response.error) {
+      setMessage(`Unable to save the video: ${response.error.message}`)
+    } else {
+      setMessage(editingId ? 'Video updated.' : 'Video added.')
+      resetForm()
+      await reloadVideos()
+    }
+  }
+
+  const editVideo = (video: VideoRecord) => {
+    setEditingId(video.id)
+    setTitle(video.title)
+    setDescription(video.description)
+    setYoutubeUrl(video.youtube_url)
+    setIsPublished(video.is_published)
+  }
+
+  const deleteVideo = async (video: VideoRecord) => {
+    if (!supabase || !window.confirm(`Delete "${video.title}"?`)) return
+    const { error } = await supabase.from('videos').delete().eq('id', video.id)
+    if (error) {
+      setMessage('Unable to delete the video.')
+    } else {
+      await reloadVideos()
+    }
+  }
+
+  const signOut = async () => {
+    if (!supabase) return
+    await supabase.auth.signOut()
+    navigate('/signin', { replace: true })
+  }
+
+  return (
+    <div className="space-y-10">
+      <section className="flex items-end justify-between gap-6 border-b border-[#cad4df] pb-8">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Private Dashboard</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em]">Manage videos</h1>
+        </div>
+        <button type="button" onClick={signOut} className="border-b border-[#17243b] pb-1 text-sm font-semibold">
+          Sign Out
+        </button>
+      </section>
+
+      <form onSubmit={saveVideo} className="grid gap-5 border-b border-[#cad4df] pb-10 sm:grid-cols-2">
+        <div>
+          <label htmlFor="video-title" className="mb-2 block text-sm font-medium">Title</label>
+          <input id="video-title" required maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]" />
+        </div>
+        <div>
+          <label htmlFor="video-url" className="mb-2 block text-sm font-medium">YouTube URL</label>
+          <input id="video-url" required type="url" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]" />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="video-description" className="mb-2 block text-sm font-medium">Description</label>
+          <textarea id="video-description" maxLength={5000} rows={4} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full resize-y border-b border-[#cad4df] bg-transparent px-0 py-3 outline-none focus:border-[#17243b]" />
+        </div>
+        <label className="flex items-center gap-3 text-sm font-medium">
+          <input type="checkbox" checked={isPublished} onChange={(event) => setIsPublished(event.target.checked)} />
+          Published
+        </label>
+        <div className="flex items-end gap-4">
+          <button type="submit" className="bg-[#17243b] px-5 py-3 text-sm font-semibold text-white hover:bg-[#263b5a]">
+            {editingId ? 'Update Video' : 'Add Video'}
+          </button>
+          {editingId && (
+            <button type="button" onClick={resetForm} className="border-b border-[#17243b] pb-1 text-sm font-semibold">Cancel</button>
+          )}
+        </div>
+        {message && <p role="status" className="sm:col-span-2 text-sm text-[#66758a]">{message}</p>}
+      </form>
+
+      <section className="divide-y divide-[#cad4df] border-y border-[#cad4df]">
+        {videos.map((video) => (
+          <article key={video.id} className="grid gap-4 py-5 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div>
+              <h2 className="text-lg font-semibold">{video.title}</h2>
+              <p className="mt-1 text-sm text-[#66758a]">{video.is_published ? 'Published' : 'Draft'}</p>
+            </div>
+            <div className="flex gap-5 text-sm font-semibold">
+              <button type="button" onClick={() => editVideo(video)} className="border-b border-[#17243b] pb-1">Edit</button>
+              <button type="button" onClick={() => deleteVideo(video)} className="border-b border-[#8c4335] pb-1 text-[#8c4335]">Delete</button>
+            </div>
+          </article>
+        ))}
+        {videos.length === 0 && <p className="py-8 text-sm text-[#66758a]">No videos have been added yet.</p>}
       </section>
     </div>
   )
@@ -641,23 +1160,23 @@ function ContactPage() {
   }
 
   return (
-    <div className="grid gap-6 rounded-[28px] border border-[#cabfb4] bg-[#f8f4f0] p-5 sm:p-6 lg:grid-cols-[0.9fr_1.1fr] lg:p-8">
+    <div className="grid gap-12 border-t border-[#cad4df] pt-10 lg:grid-cols-[0.9fr_1.1fr]">
       <section className="space-y-6">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-[#68635f]">Contact</p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-[-0.06em] text-[#252525] sm:text-5xl">Let&apos;s Work Together.</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#62799a]">Contact</p>
+          <h1 className="mt-3 text-5xl font-semibold leading-none tracking-[-0.06em] sm:text-6xl">Let&apos;s work together.</h1>
         </div>
 
-        <p className="max-w-lg text-base leading-8 text-[#5d5a57]">
+        <p className="max-w-lg text-base leading-8 text-[#66758a]">
           I&apos;m interested in remote opportunities, customer experience roles, freelance projects, and practical AI automation initiatives. Feel free to reach out to discuss a potential collaboration.
         </p>
 
-        <div className="space-y-3 text-sm text-[#5d5a57]">
-          <p>Email: <a href="mailto:noelcollano7@gmail.com" className="font-medium text-[#252525] underline decoration-[#6e7560] underline-offset-4">noelcollano7@gmail.com</a></p>
+        <div className="border-t border-[#cad4df] pt-5 text-sm text-[#66758a]">
+          <p>Email: <a href="mailto:noelcollano7@gmail.com" className="font-semibold text-[#17243b] underline underline-offset-4">noelcollano7@gmail.com</a></p>
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-[#cabfb4] bg-[#f3eee8] p-5 sm:p-6">
+      <section className="border-t border-[#cad4df] pt-6">
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           <div className="hidden" aria-hidden="true">
             <label htmlFor="website">Leave this field empty</label>
@@ -673,7 +1192,7 @@ function ContactPage() {
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#252525]">Full Name</label>
+              <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#17243b]">Full Name</label>
               <input
                 id="name"
                 name="name"
@@ -683,13 +1202,13 @@ function ContactPage() {
                 onChange={handleChange}
                 disabled={isSubmitting}
                 aria-invalid={Boolean(errors.name)}
-                className="w-full rounded-xl border border-[#cabfb4] bg-[#f9f5f1] px-3 py-2.5 text-[#252525] outline-none transition focus:border-[#6e7560] focus:ring-2 focus:ring-[#d1d8cc]"
+                className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 text-[#17243b] outline-none transition focus:border-[#17243b]"
               />
               {errors.name && <p className="mt-2 text-sm text-[#8c4335]">{errors.name}</p>}
             </div>
 
             <div>
-              <label htmlFor="email" className="mb-2 block text-sm font-medium text-[#252525]">Email Address</label>
+              <label htmlFor="email" className="mb-2 block text-sm font-medium text-[#17243b]">Email Address</label>
               <input
                 id="email"
                 name="email"
@@ -699,14 +1218,14 @@ function ContactPage() {
                 onChange={handleChange}
                 disabled={isSubmitting}
                 aria-invalid={Boolean(errors.email)}
-                className="w-full rounded-xl border border-[#cabfb4] bg-[#f9f5f1] px-3 py-2.5 text-[#252525] outline-none transition focus:border-[#6e7560] focus:ring-2 focus:ring-[#d1d8cc]"
+                className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 text-[#17243b] outline-none transition focus:border-[#17243b]"
               />
               {errors.email && <p className="mt-2 text-sm text-[#8c4335]">{errors.email}</p>}
             </div>
           </div>
 
           <div>
-            <label htmlFor="subject" className="mb-2 block text-sm font-medium text-[#252525]">Subject</label>
+            <label htmlFor="subject" className="mb-2 block text-sm font-medium text-[#17243b]">Subject</label>
             <input
               id="subject"
               name="subject"
@@ -716,13 +1235,13 @@ function ContactPage() {
               onChange={handleChange}
               disabled={isSubmitting}
               aria-invalid={Boolean(errors.subject)}
-              className="w-full rounded-xl border border-[#cabfb4] bg-[#f9f5f1] px-3 py-2.5 text-[#252525] outline-none transition focus:border-[#6e7560] focus:ring-2 focus:ring-[#d1d8cc]"
+              className="w-full border-b border-[#cad4df] bg-transparent px-0 py-3 text-[#17243b] outline-none transition focus:border-[#17243b]"
             />
             {errors.subject && <p className="mt-2 text-sm text-[#8c4335]">{errors.subject}</p>}
           </div>
 
           <div>
-            <label htmlFor="message" className="mb-2 block text-sm font-medium text-[#252525]">Message</label>
+            <label htmlFor="message" className="mb-2 block text-sm font-medium text-[#17243b]">Message</label>
             <textarea
               id="message"
               name="message"
@@ -732,7 +1251,7 @@ function ContactPage() {
               disabled={isSubmitting}
               rows={6}
               aria-invalid={Boolean(errors.message)}
-              className="w-full rounded-xl border border-[#cabfb4] bg-[#f9f5f1] px-3 py-2.5 text-[#252525] outline-none transition focus:border-[#6e7560] focus:ring-2 focus:ring-[#d1d8cc]"
+              className="w-full resize-y border-b border-[#cad4df] bg-transparent px-0 py-3 text-[#17243b] outline-none transition focus:border-[#17243b]"
             />
             {errors.message && <p className="mt-2 text-sm text-[#8c4335]">{errors.message}</p>}
           </div>
@@ -740,7 +1259,7 @@ function ContactPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#6e7560] px-5 py-3 text-sm font-medium text-[#f8f5f1] transition-transform disabled:cursor-not-allowed disabled:opacity-75 hover:-translate-y-0.5 hover:bg-[#59654c]"
+            className="inline-flex w-full items-center justify-center gap-2 bg-[#17243b] px-5 py-3.5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-75 hover:bg-[#263b5a]"
           >
             {isSubmitting ? 'Sending message...' : 'Send Message'}
             {!isSubmitting && <ArrowRight size={16} />}

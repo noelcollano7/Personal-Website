@@ -6,8 +6,8 @@
   font-family: Inter, 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #252525;
-  background: #ece3d7;
+  color: #17243b;
+  background: #edf1f5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,9 +21,7 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.55), transparent 28%),
-    #ece3d7;
+  background: #edf1f5;
 }
 
 #root {
